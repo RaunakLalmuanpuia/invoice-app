@@ -5,6 +5,7 @@ namespace App\Ai\Agents;
 use App\Ai\Tools\GenerateInvoicePdf;
 use App\Ai\Tools\SaveInvoiceDraft;
 use App\Ai\Tools\StartNewInvoice;
+use App\Ai\Tools\SearchBusinessData;
 use Laravel\Ai\Attributes\Provider;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
@@ -26,41 +27,43 @@ class InvoiceAssistant implements Agent, Conversational, HasTools
 
     public function instructions(): string
     {
-        // Convert state to readable text for the AI
         $stateInfo = !empty($this->invoiceState)
             ? "\n\n=== CURRENT KNOWN DATA ===\n" . json_encode($this->invoiceState, JSON_PRETTY_PRINT) . "\n=========================\n"
             : "\n\n=== CURRENT KNOWN DATA ===\n(No data collected yet)\n=========================\n";
 
         return <<<PROMPT
-        You are an expert GST Tax Invoice assistant for Indian businesses.
+        You are an expert GST Tax Invoice assistant.
 
         {$stateInfo}
 
-        **YOUR PRIMARY GOAL:**
-        Collect missing information to generate a valid GST invoice.
+        **YOUR GOAL:** Collect info and generate an invoice.
 
-        **RULES FOR HANDLING DATA:**
-        1. **Check 'CURRENT KNOWN DATA' first.** If a field exists there, DO NOT ask for it again.
-        2. **When user provides info:** You MUST call the `SaveInvoiceDraft` tool immediately to save it.
-        3. **After saving:** Acknowledge what was saved, then ask for the *next* missing field from the required list below.
+        **CRITICAL WORKFLOW:**
+        1. **CHECK RECORDS FIRST:** - If the user mentions a Client Name (e.g., "Invoice for Acme"), run `SearchBusinessData` (type='client').
+           - If found, call `SaveInvoiceDraft` with the returned details immediately. DO NOT ask the user for address/GST if found.
+
+        2. **CHECK INVENTORY:**
+           - If the user mentions an Item (e.g., "Add Hosting"), run `SearchBusinessData` (type='product').
+           - If found, use the Rate and HSN from the result to add the line item.
+
+        3. **MANUAL FALLBACK:** - Only ask the user for details (Address, GST, Rate) if `SearchBusinessData` returns "found": false.
 
         **REQUIRED FIELDS SEQUENCE:**
-        1. Seller Details (Name, GSTIN, State)
-        2. Client Details (Name, Email, Address, GSTIN, State)
-        3. Invoice Dates (Date, Due Date)
-        4. Line Items (Description, Qty, Rate, HSN)
+        1. Client Details (Name -> Search -> Save)
+        2. Line Items (Item Name -> Search -> Save)
+        3. Invoice Dates
 
         **FINAL STEP:**
-        Once all fields are present in 'CURRENT KNOWN DATA', show a summary and ask for confirmation to generate the PDF.
-        Only call `GenerateInvoicePdf` if the user explicitly confirms (e.g., "Yes", "Create it").
+        Once fields are present in 'CURRENT KNOWN DATA', ask for confirmation to generate PDF.
         PROMPT;
     }
 
     public function tools(): iterable
     {
         return [
-            new SaveInvoiceDraft,   // <--- The AI uses this to "remember"
-            new GenerateInvoicePdf, // <--- The AI uses this to "finish"
+            new SearchBusinessData,
+            new SaveInvoiceDraft,
+            new GenerateInvoicePdf,
             new StartNewInvoice,
         ];
     }

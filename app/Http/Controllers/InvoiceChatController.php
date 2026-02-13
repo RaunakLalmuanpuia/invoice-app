@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Ai\Agents\InvoiceAssistant;
+use App\Services\MockDataService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Storage;
@@ -20,6 +21,14 @@ class InvoiceChatController extends Controller
         try {
             $stateKey = 'invoice_state_' . ($request->conversation_id ?? 'new');
             $invoiceState = Cache::get($stateKey, []);
+
+            if (empty($invoiceState) || !isset($invoiceState['seller_company_name'])) {
+                $sellerData = MockDataService::getSellerDetails();
+                $invoiceState = array_merge($invoiceState, $sellerData);
+
+                // Optional: Update cache immediately so it persists
+                Cache::put($stateKey, $invoiceState, now()->addHours(24));
+            }
 
             $agent = new InvoiceAssistant($invoiceState);
 
@@ -123,11 +132,20 @@ class InvoiceChatController extends Controller
 
     public function download($filename)
     {
-        $path = 'invoices/' . $filename;
-        if (!Storage::exists($path)) abort(404);
-        return Storage::download($path, $filename);
-    }
+        // 1. Check if it is a Final Invoice
+        $finalPath = 'invoices/' . $filename;
+        if (Storage::exists($finalPath)) {
+            return Storage::download($finalPath, $filename);
+        }
 
+        // 2. Check if it is a Draft
+        $draftPath = 'temp/' . $filename;
+        if (Storage::exists($draftPath)) {
+            return Storage::download($draftPath, $filename);
+        }
+
+        abort(404, 'File not found');
+    }
     public function create()
     {
         return inertia('Invoices/CreateInvoice');

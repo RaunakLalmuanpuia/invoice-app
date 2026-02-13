@@ -12,13 +12,14 @@ class GenerateInvoicePdf implements Tool
 {
     public function description(): string
     {
-        return 'Generates a professional GST-compliant PDF Tax Invoice from the collected data. Only use this after user confirms all details are correct.';
+        return 'Generates a PDF Invoice. Use is_draft=true for previews. Use is_draft=false ONLY when the user explicitly confirms the preview is correct.';
     }
 
     public function handle(Request $request): string
     {
         try {
             $data = $request->all();
+            $isDraft = $data['is_draft'] ?? true;
 
             // Process Line Items with HSN codes and units
             $rawItems = isset($data['line_items_json'])
@@ -48,8 +49,23 @@ class GenerateInvoicePdf implements Tool
             $gstAmount = $subtotal * 0.18;
             $totalAmount = $subtotal + $gstAmount;
 
-            // Generate unique invoice number
-            $invoiceNumber = 'INV-' . time();
+            // === FIX START: INTELLIGENT NUMBER GENERATION ===
+            $providedNumber = $data['invoice_number'] ?? null;
+
+            if ($isDraft) {
+                // Always generate a new random draft ID to prevent caching issues
+                $invoiceNumber = 'DRAFT-' . time();
+            } else {
+                // FINALIZATION LOGIC:
+                // If no number provided, OR if the provided number is a "DRAFT", generate a real INV- number.
+                if (empty($providedNumber) || str_starts_with($providedNumber, 'DRAFT-')) {
+                    $invoiceNumber = 'INV-' . time();
+                } else {
+                    // Respect manual overrides only if they don't look like drafts
+                    $invoiceNumber = $providedNumber;
+                }
+            }
+            // === FIX END ===
 
             // Prepare invoice data for the view
             $invoiceData = (object)[
@@ -79,16 +95,23 @@ class GenerateInvoicePdf implements Tool
             // Generate the PDF
             $pdf = Pdf::loadView('invoices.sales_tax_template', ['invoice' => $invoiceData]);
 
-            // Save to storage
-            $path = 'invoices/' . $invoiceNumber . '.pdf';
-            Storage::put($path, $pdf->output());
+            // --- 5. Determine Storage Path ---
+            if ($isDraft) {
+                // Save to temporary folder
+                $path = 'temp/' . $invoiceNumber . '.pdf';
+            } else {
+                // Save to permanent folder
+                $path = 'invoices/' . $invoiceNumber . '.pdf';
+            }
 
+            Storage::put($path, $pdf->output());
             // Generate public URL
             $url = Storage::url($path);
 
             return json_encode([
                 'success' => true,
                 'pdf_generated' => true,
+                'is_draft' => $isDraft,
                 'invoice_number' => $invoiceNumber,
                 'total_amount' => $totalAmount,
                 'pdf_path' => $path,
@@ -107,14 +130,13 @@ class GenerateInvoicePdf implements Tool
     public function schema(JsonSchema $schema): array
     {
         return [
+            'is_draft' => $schema->boolean()->description('Set to TRUE for previews. Set to FALSE only when user confirms.'),
             'invoice_number' => $schema->string()->description('Auto-generated if left empty'),
-
             // Seller Details
             'seller_company_name' => $schema->string()->required()->description('Your company name'),
             'seller_gst_number' => $schema->string()->nullable()->description('Your 15 character GST number'),
             'seller_state' => $schema->string()->nullable()->description('Your state name (e.g., Kerala, Maharashtra)'),
             'seller_state_code' => $schema->string()->nullable()->description('Your 2-digit state code (e.g., 32, 27)'),
-
             // Client Details
             'client_name' => $schema->string()->required(),
             'client_email' => $schema->string()->required(),
