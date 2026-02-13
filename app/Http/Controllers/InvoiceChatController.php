@@ -11,6 +11,26 @@ use Illuminate\Support\Facades\Log;
 
 class InvoiceChatController extends Controller
 {
+    public function index()
+    {
+        // Use storage_path to get the full system path
+        $fullPath = storage_path('app/private/invoices/all_invoices.json');
+
+        if (file_exists($fullPath)) {
+            $jsonContent = file_get_contents($fullPath);
+            $invoices = json_decode($jsonContent, true);
+        } else {
+            $invoices = [];
+            // Debug: This will show you exactly where PHP is looking
+            // dd("File not found at: " . $fullPath);
+        }
+
+//        dd($invoices);
+        return inertia('Invoices/Index', [
+            'invoices' => array_values($invoices ?? [])
+        ]);
+    }
+
     public function chat(Request $request)
     {
         $request->validate([

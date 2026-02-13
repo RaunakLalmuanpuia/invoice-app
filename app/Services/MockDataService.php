@@ -25,13 +25,19 @@ class MockDataService
     // === SMART SEARCH HELPER ===
     private static function fuzzySearch(array $items, string $query): array
     {
-        $queryWords = explode(' ', strtolower($query));
+        $cleanQuery = trim(strtolower($query));
+
+        // === NEW: Return all records if requested ===
+        if (empty($cleanQuery) || $cleanQuery === 'all') {
+            return $items;
+        }
+
+        $queryWords = explode(' ', $cleanQuery);
 
         return array_filter($items, function ($item) use ($queryWords) {
             $itemName = strtolower($item['name']);
             foreach ($queryWords as $word) {
-                // Ignore small words like "and", "for", "the"
-                if (strlen($word) > 2 && str_contains($itemName, Str::singular($word))) {
+                if (strlen($word) > 2 && str_contains($itemName, \Illuminate\Support\Str::singular($word))) {
                     return true;
                 }
             }
@@ -45,7 +51,22 @@ class MockDataService
         if (!Storage::exists(self::$clientPath)) {
             $defaults = [
                 ['name' => 'Infosys Guest House', 'email' => 'admin@infosys-gh.com', 'address' => 'Electronic City, Bangalore, Karnataka', 'gst_number' => '29AAAAA5678A1Z5', 'state' => 'Karnataka', 'state_code' => '29'],
-                // ... other defaults
+                [
+                    'name' => 'Marriott Hotel Supplies',
+                    'email' => 'purchase@marriott.com',
+                    'address' => 'Juhu Tara Road, Mumbai, Maharashtra',
+                    'gst_number' => '27BBBBB1234B1Z6',
+                    'state' => 'Maharashtra',
+                    'state_code' => '27'
+                ],
+                [
+                    'name' => 'Urban Clap Services',
+                    'email' => 'partners@urbanclap.com',
+                    'address' => 'Udyog Vihar, Gurgaon, Haryana',
+                    'gst_number' => '06CCCCC9876C1Z7',
+                    'state' => 'Haryana',
+                    'state_code' => '06'
+                ],
             ];
             self::saveClients($defaults);
         }

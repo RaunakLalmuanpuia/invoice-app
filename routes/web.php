@@ -30,6 +30,8 @@ Route::middleware('auth')->group(function () {
 
 // Invoice Routes
 Route::middleware(['auth'])->group(function () {
+
+    Route::get('/invoices', [InvoiceChatController::class, 'index'])->name('invoices.index');
     // Create Invoice Page
     Route::get('/invoices/create', [InvoiceChatController::class, 'create'])->name('invoices.create');
 

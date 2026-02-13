@@ -16,18 +16,29 @@ class SearchBusinessData implements Tool
 
     public function handle(Request $request): string
     {
-        // FIX: Use property access or ->all() instead of ->input()
         $type = $request->type ?? $request->all()['type'] ?? null;
         $query = $request->query ?? $request->all()['query'] ?? '';
+
+        // Check if the user is asking for a list/all
+        $isListRequest = empty($query) || in_array(strtolower($query), ['all', 'list', 'show all']);
 
         if ($type === 'client') {
             $results = MockDataService::searchClients($query);
 
             if (empty($results)) {
-                return json_encode(['found' => false, 'message' => 'Client not found in records.']);
+                return json_encode(['found' => false, 'message' => 'No clients found.']);
             }
 
-            // Return the first match, formatted for the Invoice State
+            // If it's a list request, return a summary of all clients
+            if ($isListRequest) {
+                return json_encode([
+                    'found' => true,
+                    'is_list' => true,
+                    'clients' => array_values($results)
+                ]);
+            }
+
+            // Otherwise, return the specific match for invoice state
             $client = array_values($results)[0];
             return json_encode([
                 'found' => true,
@@ -46,17 +57,17 @@ class SearchBusinessData implements Tool
             $results = MockDataService::searchInventory($query);
 
             if (empty($results)) {
-                return json_encode(['found' => false, 'message' => 'Item not found in inventory.']);
+                return json_encode(['found' => false, 'message' => 'Inventory is empty.']);
             }
 
-            // Return all matches so AI can pick the best one
             return json_encode([
                 'found' => true,
+                'is_list' => $isListRequest,
                 'items' => array_values($results)
             ]);
         }
 
-        return json_encode(['error' => 'Invalid search type. Use "client" or "product".']);
+        return json_encode(['error' => 'Invalid type. Use "client" or "product".']);
     }
 
     public function schema(JsonSchema $schema): array
