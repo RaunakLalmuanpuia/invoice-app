@@ -6,6 +6,8 @@ use App\Ai\Tools\GenerateInvoicePdf;
 use App\Ai\Tools\SaveInvoiceDraft;
 use App\Ai\Tools\StartNewInvoice;
 use App\Ai\Tools\SearchBusinessData;
+use App\Ai\Tools\SaveClientData;
+use App\Ai\Tools\SaveInventoryData;
 use Laravel\Ai\Attributes\Provider;
 use Laravel\Ai\Contracts\Agent;
 use Laravel\Ai\Contracts\Conversational;
@@ -32,29 +34,28 @@ class InvoiceAssistant implements Agent, Conversational, HasTools
             : "\n\n=== CURRENT KNOWN DATA ===\n(No data collected yet)\n=========================\n";
 
         return <<<PROMPT
-        You are an expert GST Tax Invoice assistant.
+        You are an expert GST Tax Invoice assistant for 'Tili Technologies'.
 
         {$stateInfo}
 
-        **YOUR GOAL:** Collect info and generate an invoice.
+        **YOUR GOAL:** Collect info, show a DRAFT, and finalize.
 
-        **CRITICAL WORKFLOW:**
-        1. **CHECK RECORDS FIRST:** - If the user mentions a Client Name (e.g., "Invoice for Acme"), run `SearchBusinessData` (type='client').
-           - If found, call `SaveInvoiceDraft` with the returned details immediately. DO NOT ask the user for address/GST if found.
+        **WORKFLOW:**
+        1. **Identify Client:**
+           - User says name -> Run `SearchBusinessData` (client).
+           - **IF NOT FOUND:** Ask for Address/GST -> Run `SaveClientData`.
+           - Once you have data -> Run `SaveInvoiceDraft`.
 
-        2. **CHECK INVENTORY:**
-           - If the user mentions an Item (e.g., "Add Hosting"), run `SearchBusinessData` (type='product').
-           - If found, use the Rate and HSN from the result to add the line item.
+        2. **Identify Items:**
+           - User says item -> Run `SearchBusinessData` (product).
+           - **IF FOUND:** Use the rate/HSN from the result.
+           - **IF NOT FOUND:** - Tell user: "I don't see 'X' in inventory. What is the Rate and HSN code?"
+             - User provides info -> Run `SaveInventoryData` to store it permanently.
+             - Then run `SaveInvoiceDraft` to add it to the current invoice.
 
-        3. **MANUAL FALLBACK:** - Only ask the user for details (Address, GST, Rate) if `SearchBusinessData` returns "found": false.
-
-        **REQUIRED FIELDS SEQUENCE:**
-        1. Client Details (Name -> Search -> Save)
-        2. Line Items (Item Name -> Search -> Save)
-        3. Invoice Dates
-
-        **FINAL STEP:**
-        Once fields are present in 'CURRENT KNOWN DATA', ask for confirmation to generate PDF.
+        3. **Draft & Finalize:** - Generate PDF with `is_draft=true`.
+           - Ask for confirmation.
+           - Generate PDF with `is_draft=false` ONLY after confirmation.
         PROMPT;
     }
 
@@ -62,6 +63,8 @@ class InvoiceAssistant implements Agent, Conversational, HasTools
     {
         return [
             new SearchBusinessData,
+            new SaveClientData,
+            new SaveInventoryData,
             new SaveInvoiceDraft,
             new GenerateInvoicePdf,
             new StartNewInvoice,
