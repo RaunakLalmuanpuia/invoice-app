@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str; // Import Str for singularization
 
 class MockDataService
 {
+    // ... (keep seller details same) ...
     private static $seller = [
         'seller_company_name' => 'Tili Technologies',
         'seller_gst_number'   => '32AAAAA8888A1Z5',
@@ -18,21 +20,55 @@ class MockDataService
         return self::$seller;
     }
 
-    // === DYNAMIC CLIENT MANAGEMENT ===
+    // === SMART SEARCH HELPER ===
+    private static function fuzzySearch(array $items, string $query): array
+    {
+        $queryWords = explode(' ', strtolower($query));
 
+        return array_filter($items, function ($item) use ($queryWords) {
+            $itemName = strtolower($item['name']);
+            // Check if ANY word from the query exists in the item name
+            // (e.g. "Hosting" from "Hosting Servers" will match "Hosting Server")
+            foreach ($queryWords as $word) {
+                // Ignore small words like "and", "for", "the"
+                if (strlen($word) > 2 && str_contains($itemName, Str::singular($word))) {
+                    return true;
+                }
+            }
+            return false;
+        });
+    }
+
+    // === CLIENTS ===
     private static function getClients(): array
     {
-        // 1. Check if file exists, if not create it with default data
         if (!Storage::exists('data/clients.json')) {
             $defaults = [
                 [
                     'name' => 'Acme Corp',
                     'email' => 'accounts@acme.com',
-                    'address' => '123 Industrial Estate, Mumbai',
+                    'address' => '123 Industrial Estate, Mumbai, Maharashtra',
                     'gst_number' => '27AAAAA0000A1Z5',
                     'state' => 'Maharashtra',
                     'state_code' => '27'
-                ]
+                ],
+                // ADDED BACK WAYNE & STARK
+                [
+                    'name' => 'Wayne Enterprises',
+                    'email' => 'alfred@wayne.com',
+                    'address' => '1007 Mountain Drive, Gotham, Gujarat',
+                    'gst_number' => '24BBBBB1111B1Z6',
+                    'state' => 'Gujarat',
+                    'state_code' => '24'
+                ],
+                [
+                    'name' => 'Stark Industries',
+                    'email' => 'pepper@stark.com',
+                    'address' => 'Stark Tower, New York, Delhi',
+                    'gst_number' => '07CCCCC2222C1Z7',
+                    'state' => 'Delhi',
+                    'state_code' => '07'
+                ],
             ];
             Storage::put('data/clients.json', json_encode($defaults, JSON_PRETTY_PRINT));
         }
@@ -42,27 +78,19 @@ class MockDataService
 
     public static function searchClients(string $query): array
     {
-        $clients = self::getClients();
-        return array_filter($clients, fn($client) => str_contains(strtolower($client['name']), strtolower($query)));
+        return self::fuzzySearch(self::getClients(), $query);
     }
 
     public static function addClient(array $newClient): void
     {
         $clients = self::getClients();
-
-        // Prevent duplicates (simple check by name)
-        foreach ($clients as $client) {
-            if (strtolower($client['name']) === strtolower($newClient['name'])) {
-                return;
-            }
-        }
-
         $clients[] = $newClient;
         Storage::put('data/clients.json', json_encode($clients, JSON_PRETTY_PRINT));
     }
+
+    // === INVENTORY ===
     private static function getInventory(): array
     {
-        // 1. Check if file exists, if not create it with default data
         if (!Storage::exists('data/inventory.json')) {
             $defaults = [
                 ['name' => 'Web Development Service', 'rate' => 50000.00, 'hsn_code' => '9983', 'unit' => 'Service'],
@@ -71,27 +99,17 @@ class MockDataService
             ];
             Storage::put('data/inventory.json', json_encode($defaults, JSON_PRETTY_PRINT));
         }
-
         return json_decode(Storage::get('data/inventory.json'), true);
     }
 
     public static function searchInventory(string $query): array
     {
-        $inventory = self::getInventory();
-        return array_filter($inventory, fn($item) => str_contains(strtolower($item['name']), strtolower($query)));
+        return self::fuzzySearch(self::getInventory(), $query);
     }
 
     public static function addInventoryItem(array $newItem): void
     {
         $inventory = self::getInventory();
-
-        // Prevent duplicates (simple check by name)
-        foreach ($inventory as $item) {
-            if (strtolower($item['name']) === strtolower($newItem['name'])) {
-                return;
-            }
-        }
-
         $inventory[] = $newItem;
         Storage::put('data/inventory.json', json_encode($inventory, JSON_PRETTY_PRINT));
     }
