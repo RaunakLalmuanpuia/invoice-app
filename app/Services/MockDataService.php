@@ -7,12 +7,12 @@ use Illuminate\Support\Str; // Import Str for singularization
 
 class MockDataService
 {
-    // ... (keep seller details same) ...
+    // Seller: A Large Department Store
     private static $seller = [
-        'seller_company_name' => 'Tili Technologies',
-        'seller_gst_number'   => '32AAAAA8888A1Z5',
-        'seller_state'        => 'Kerala',
-        'seller_state_code'   => '32',
+        'seller_company_name' => 'Grand Central Retail Ltd',
+        'seller_gst_number'   => '27AAAAA7777A1Z5',
+        'seller_state'        => 'Maharashtra',
+        'seller_state_code'   => '27',
     ];
 
     public static function getSellerDetails(): array
@@ -27,8 +27,6 @@ class MockDataService
 
         return array_filter($items, function ($item) use ($queryWords) {
             $itemName = strtolower($item['name']);
-            // Check if ANY word from the query exists in the item name
-            // (e.g. "Hosting" from "Hosting Servers" will match "Hosting Server")
             foreach ($queryWords as $word) {
                 // Ignore small words like "and", "for", "the"
                 if (strlen($word) > 2 && str_contains($itemName, Str::singular($word))) {
@@ -39,35 +37,34 @@ class MockDataService
         });
     }
 
-    // === CLIENTS ===
+    // === CLIENTS (Corporate Accounts & Loyalty Customers) ===
     private static function getClients(): array
     {
         if (!Storage::exists('data/clients.json')) {
             $defaults = [
                 [
-                    'name' => 'Acme Corp',
-                    'email' => 'accounts@acme.com',
-                    'address' => '123 Industrial Estate, Mumbai, Maharashtra',
-                    'gst_number' => '27AAAAA0000A1Z5',
+                    'name' => 'Infosys Guest House',
+                    'email' => 'admin@infosys-gh.com',
+                    'address' => 'Electronic City, Bangalore, Karnataka',
+                    'gst_number' => '29AAAAA5678A1Z5',
+                    'state' => 'Karnataka',
+                    'state_code' => '29'
+                ],
+                [
+                    'name' => 'Marriott Hotel Supplies',
+                    'email' => 'purchase@marriott.com',
+                    'address' => 'Juhu Tara Road, Mumbai, Maharashtra',
+                    'gst_number' => '27BBBBB1234B1Z6',
                     'state' => 'Maharashtra',
                     'state_code' => '27'
                 ],
-                // ADDED BACK WAYNE & STARK
                 [
-                    'name' => 'Wayne Enterprises',
-                    'email' => 'alfred@wayne.com',
-                    'address' => '1007 Mountain Drive, Gotham, Gujarat',
-                    'gst_number' => '24BBBBB1111B1Z6',
-                    'state' => 'Gujarat',
-                    'state_code' => '24'
-                ],
-                [
-                    'name' => 'Stark Industries',
-                    'email' => 'pepper@stark.com',
-                    'address' => 'Stark Tower, New York, Delhi',
-                    'gst_number' => '07CCCCC2222C1Z7',
-                    'state' => 'Delhi',
-                    'state_code' => '07'
+                    'name' => 'Urban Clap Services',
+                    'email' => 'partners@urbanclap.com',
+                    'address' => 'Udyog Vihar, Gurgaon, Haryana',
+                    'gst_number' => '06CCCCC9876C1Z7',
+                    'state' => 'Haryana',
+                    'state_code' => '06'
                 ],
             ];
             Storage::put('data/clients.json', json_encode($defaults, JSON_PRETTY_PRINT));
@@ -88,14 +85,25 @@ class MockDataService
         Storage::put('data/clients.json', json_encode($clients, JSON_PRETTY_PRINT));
     }
 
-    // === INVENTORY ===
+    // === INVENTORY (Mixed Departments) ===
     private static function getInventory(): array
     {
         if (!Storage::exists('data/inventory.json')) {
             $defaults = [
-                ['name' => 'Web Development Service', 'rate' => 50000.00, 'hsn_code' => '9983', 'unit' => 'Service'],
-                ['name' => 'Annual Maintenance Contract', 'rate' => 12000.00, 'hsn_code' => '9987', 'unit' => 'Year'],
-                ['name' => 'Hosting Server (Basic)', 'rate' => 5000.00, 'hsn_code' => '998311', 'unit' => 'Year'],
+                // Electronics Dept
+                ['name' => 'Samsung 55" 4K Smart TV', 'rate' => 54999.00, 'hsn_code' => '8528', 'unit' => 'Unit'],
+                ['name' => 'Philips Mixer Grinder 750W', 'rate' => 3400.00, 'hsn_code' => '8509', 'unit' => 'Unit'],
+
+                // Grocery / FMCG
+                ['name' => 'Royal Basmati Rice (5kg Bag)', 'rate' => 850.00, 'hsn_code' => '1006', 'unit' => 'Bag'],
+                ['name' => 'Fortune Sunflower Oil (1L)', 'rate' => 145.00, 'hsn_code' => '1512', 'unit' => 'Pouch'],
+
+                // Apparel / Clothing
+                ['name' => 'Levi\'s Men\'s Denim Jeans', 'rate' => 2499.00, 'hsn_code' => '6203', 'unit' => 'Pair'],
+                ['name' => 'Cotton Polo T-Shirt (Bulk)', 'rate' => 450.00, 'hsn_code' => '6105', 'unit' => 'Piece'],
+
+                // Home & Living
+                ['name' => 'Prestige Pressure Cooker (5L)', 'rate' => 1800.00, 'hsn_code' => '7615', 'unit' => 'Unit'],
             ];
             Storage::put('data/inventory.json', json_encode($defaults, JSON_PRETTY_PRINT));
         }

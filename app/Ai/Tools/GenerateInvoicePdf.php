@@ -102,6 +102,24 @@ class GenerateInvoicePdf implements Tool
             } else {
                 // Save to permanent folder
                 $path = 'invoices/' . $invoiceNumber . '.pdf';
+
+                // === 2. APPEND TO SINGLE JSON FILE (Only for Final Invoices) ===
+                $jsonFilePath = 'invoices/all_invoices.json';
+
+                // Get existing data
+                if (Storage::exists($jsonFilePath)) {
+                    $existingJson = Storage::get($jsonFilePath);
+                    $allInvoices = json_decode($existingJson, true) ?? [];
+                } else {
+                    $allInvoices = [];
+                }
+
+                // Add new invoice (keyed by invoice number to avoid duplicates easily)
+                // Using array_unshift puts the newest invoice at the top
+                $allInvoices[$invoiceNumber] = $invoiceData;
+
+                // Save back to file
+                Storage::put($jsonFilePath, json_encode($allInvoices, JSON_PRETTY_PRINT));
             }
 
             Storage::put($path, $pdf->output());
