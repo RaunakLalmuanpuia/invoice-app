@@ -25,7 +25,6 @@ class InvoiceChatController extends Controller
             // dd("File not found at: " . $fullPath);
         }
 
-//        dd($invoices);
         return inertia('Invoices/Index', [
             'invoices' => array_values($invoices ?? [])
         ]);
@@ -91,23 +90,42 @@ class InvoiceChatController extends Controller
             // --- SCENARIO 3: GENERATING PDF ---
             $pdfUrl = null;
             $invoiceNumber = $invoiceState['invoice_number'] ?? null;
+            $isFinalInvoice = false; // <-- NEW FLAG
 
             if (!empty($updates['pdf_result'])) {
                 $pdfData = $updates['pdf_result'];
                 if ($pdfData['pdf_generated']) {
                     $invoiceNumber = $pdfData['invoice_number'];
-                    $invoiceState['current_pdf_path'] = $pdfData['pdf_path']; // Track new file
+                    $invoiceState['current_pdf_path'] = $pdfData['pdf_path'];
                     $invoiceState['invoice_number'] = $invoiceNumber;
                     $pdfUrl = route('invoices.download', ['filename' => basename($pdfData['pdf_path'])]);
+
+                    // <-- NEW: Check if this was a finalized invoice
+                    if (isset($pdfData['is_draft']) && $pdfData['is_draft'] === false) {
+                        $isFinalInvoice = true;
+                    }
                 }
             }
 
-            // If we still have a valid PDF in state (and didn't just delete it in Scenario 2)
             if (empty($pdfUrl) && isset($invoiceState['current_pdf_path'])) {
                 $pdfUrl = route('invoices.download', ['filename' => basename($invoiceState['current_pdf_path'])]);
             }
 
-            // Save state
+            // === NEW: AUTO-RESET ON FINALIZATION ===
+            if ($isFinalInvoice) {
+                // Wipe the backend state so the next message starts completely fresh
+                Cache::forget($stateKey);
+
+                return response()->json([
+                    'response' => $response->text,
+                    'conversation_id' => $response->conversationId, // Keep chat history flowing
+                    'invoice_data' => [], // Give the frontend an empty state
+                    'pdf_url' => $pdfUrl, // Give them the final download link!
+                    'invoice_number' => $invoiceNumber,
+                ]);
+            }
+
+            // Save state (Only if NOT final)
             Cache::put($stateKey, $invoiceState, now()->addHours(24));
 
             return response()->json([
