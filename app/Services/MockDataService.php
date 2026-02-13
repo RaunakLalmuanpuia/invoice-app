@@ -7,6 +7,8 @@ use Illuminate\Support\Str; // Import Str for singularization
 
 class MockDataService
 {
+    private static $clientPath = 'data/clients.json';
+
     // Seller: A Large Department Store
     private static $seller = [
         'seller_company_name' => 'Grand Central Retail Ltd',
@@ -37,56 +39,89 @@ class MockDataService
         });
     }
 
-    // === CLIENTS (Corporate Accounts & Loyalty Customers) ===
-    private static function getClients(): array
+    // === READ ALL ===
+    public static function getClients(): array
     {
-        if (!Storage::exists('data/clients.json')) {
+        if (!Storage::exists(self::$clientPath)) {
             $defaults = [
-                [
-                    'name' => 'Infosys Guest House',
-                    'email' => 'admin@infosys-gh.com',
-                    'address' => 'Electronic City, Bangalore, Karnataka',
-                    'gst_number' => '29AAAAA5678A1Z5',
-                    'state' => 'Karnataka',
-                    'state_code' => '29'
-                ],
-                [
-                    'name' => 'Marriott Hotel Supplies',
-                    'email' => 'purchase@marriott.com',
-                    'address' => 'Juhu Tara Road, Mumbai, Maharashtra',
-                    'gst_number' => '27BBBBB1234B1Z6',
-                    'state' => 'Maharashtra',
-                    'state_code' => '27'
-                ],
-                [
-                    'name' => 'Urban Clap Services',
-                    'email' => 'partners@urbanclap.com',
-                    'address' => 'Udyog Vihar, Gurgaon, Haryana',
-                    'gst_number' => '06CCCCC9876C1Z7',
-                    'state' => 'Haryana',
-                    'state_code' => '06'
-                ],
+                ['name' => 'Infosys Guest House', 'email' => 'admin@infosys-gh.com', 'address' => 'Electronic City, Bangalore, Karnataka', 'gst_number' => '29AAAAA5678A1Z5', 'state' => 'Karnataka', 'state_code' => '29'],
+                // ... other defaults
             ];
-            Storage::put('data/clients.json', json_encode($defaults, JSON_PRETTY_PRINT));
+            self::saveClients($defaults);
         }
 
-        return json_decode(Storage::get('data/clients.json'), true);
+        return json_decode(Storage::get(self::$clientPath), true) ?? [];
     }
 
+    // === CREATE ===
+    public static function addClient(array $newClient): void
+    {
+        $clients = self::getClients();
+        $clients[] = $newClient;
+        self::saveClients($clients);
+    }
+
+    // === UPDATE ===
+    /**
+     * Updates a client based on their email (acting as a unique ID)
+     */
+    public static function updateClient(string $email, array $updatedData): bool
+    {
+        $clients = self::getClients();
+        $found = false;
+
+        foreach ($clients as &$client) {
+            if ($client['email'] === $email) {
+                // Merge existing data with new data
+                $client = array_merge($client, $updatedData);
+                $found = true;
+                break;
+            }
+        }
+
+        if ($found) {
+            self::saveClients($clients);
+        }
+
+        return $found;
+    }
+
+    // === DELETE ===
+    public static function deleteClient(string $email): bool
+    {
+        $clients = self::getClients();
+        $initialCount = count($clients);
+
+        // Filter out the client with the matching email
+        $clients = array_filter($clients, function ($client) use ($email) {
+            return $client['email'] !== $email;
+        });
+
+        // Re-index array to prevent JSON from turning into an object
+        $clients = array_values($clients);
+
+        if (count($clients) < $initialCount) {
+            self::saveClients($clients);
+            return true;
+        }
+
+        return false;
+    }
+
+    // === SEARCH ===
     public static function searchClients(string $query): array
     {
         return self::fuzzySearch(self::getClients(), $query);
     }
 
-    public static function addClient(array $newClient): void
+    // Helper to persist data
+    private static function saveClients(array $clients): void
     {
-        $clients = self::getClients();
-        $clients[] = $newClient;
-        Storage::put('data/clients.json', json_encode($clients, JSON_PRETTY_PRINT));
+        Storage::put(self::$clientPath, json_encode($clients, JSON_PRETTY_PRINT));
     }
 
     // === INVENTORY (Mixed Departments) ===
-    private static function getInventory(): array
+    public static function getInventory(): array
     {
         if (!Storage::exists('data/inventory.json')) {
             $defaults = [
@@ -120,5 +155,35 @@ class MockDataService
         $inventory = self::getInventory();
         $inventory[] = $newItem;
         Storage::put('data/inventory.json', json_encode($inventory, JSON_PRETTY_PRINT));
+    }
+    public static function updateInventoryItem(string $originalName, array $updatedData): bool
+    {
+        $inventory = self::getInventory();
+        $found = false;
+
+        foreach ($inventory as &$item) {
+            if ($item['name'] === $originalName) {
+                $item = array_merge($item, $updatedData);
+                $found = true;
+                break;
+            }
+        }
+
+        if ($found) {
+            Storage::put('data/inventory.json', json_encode($inventory, JSON_PRETTY_PRINT));
+        }
+        return $found;
+    }
+
+    public static function deleteInventoryItem(string $name): bool
+    {
+        $inventory = self::getInventory();
+        $filtered = array_filter($inventory, fn($item) => $item['name'] !== $name);
+
+        if (count($filtered) < count($inventory)) {
+            Storage::put('data/inventory.json', json_encode(array_values($filtered), JSON_PRETTY_PRINT));
+            return true;
+        }
+        return false;
     }
 }

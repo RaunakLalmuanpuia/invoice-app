@@ -56,6 +56,13 @@ class InvoiceAssistant implements Agent, Conversational, HasTools
         3. **Draft & Finalize:** - Generate PDF with `is_draft=true`.
            - Ask for confirmation.
            - Generate PDF with `is_draft=false` ONLY after confirmation.
+
+          **RESPONSE GUIDELINES (CRITICAL):**
+        - When presenting a DRAFT, **DO NOT** provide the link.
+        - **WHEN FINALIZED:** - Confirm the Invoice Number and Total Amount.
+            - **DO NOT** display the raw file path (e.g., "/storage/invoices/...").
+            - **DO NOT** display the full JSON output.
+            - Simply say: "Invoice generated successfully. You can download it using the button below."
         PROMPT;
     }
 
