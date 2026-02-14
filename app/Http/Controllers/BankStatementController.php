@@ -7,9 +7,16 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Laravel\Ai\Files\Document;
 use Illuminate\Support\Facades\Log;
+use App\Services\StatementParser;
 
 class BankStatementController extends Controller
 {
+    protected $parser;
+
+    public function __construct(StatementParser $parser)
+    {
+        $this->parser = $parser;
+    }
     public function index()
     {
         // Check if we have 'results' flashed to the session from a previous POST
@@ -20,7 +27,7 @@ class BankStatementController extends Controller
         ]);
     }
 
-    public function analyze(Request $request)
+    public function analyzeAi(Request $request)
     {
         $request->validate([
             'statement' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
@@ -82,6 +89,38 @@ class BankStatementController extends Controller
             return back()->withErrors([
                 'error' => 'Failed to analyze: ' . $e->getMessage()
             ]);
+        }
+    }
+
+    // Standard PDF Parser Method
+    public function analyze(Request $request)
+    {
+        $request->validate([
+            'statement' => 'required|file|mimes:pdf|max:10240',
+        ]);
+
+        try {
+            $file = $request->file('statement');
+            $filePath = $file->getRealPath();
+
+            // 1. Parse the PDF
+            $result = $this->parser->parse($filePath);
+
+//            dd($result);
+            Log::info('PDF Parsed: ' . $file->getClientOriginalName());
+            Log::info('Txns Found: ' . count($result['transactions']));
+
+            // 2. Return to view with data
+            return to_route('bank-statement.index')->with([
+                'transactions' => $result['transactions'],
+                'filename' => $file->getClientOriginalName(),
+                'total_deposits' => $result['total_deposits'],
+                'total_withdrawals' => $result['total_withdrawals'],
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('PDF parsing failed: ' . $e->getMessage());
+            return back()->withErrors(['error' => 'Failed to parse PDF: ' . $e->getMessage()]);
         }
     }
 }
