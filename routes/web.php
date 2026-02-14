@@ -7,6 +7,7 @@ use Inertia\Inertia;
 use App\Http\Controllers\InvoiceChatController;
 use App\Http\Controllers\ClientController;
 use App\Http\Controllers\InventoryController;
+use App\Http\Controllers\BankStatementController;
 
 
 Route::get('/', function () {
@@ -57,4 +58,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/inventory/{name}', [InventoryController::class, 'update'])->name('inventory.update');
     Route::delete('/inventory/{name}', [InventoryController::class, 'destroy'])->name('inventory.destroy');
 });
+
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/bank-statement', [BankStatementController::class, 'index'])
+        ->name('bank-statement.index');
+    Route::post('/bank-statement/analyze', [BankStatementController::class, 'analyze'])
+        ->name('bank-statement.analyze');
+});
+
 require __DIR__.'/auth.php';

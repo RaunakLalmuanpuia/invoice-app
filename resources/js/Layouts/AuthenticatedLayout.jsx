@@ -54,6 +54,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                 >
                                     Revenue Invoice
                                 </NavLink>
+                                <NavLink
+                                    href={route('bank-statement.index')}
+                                    active={route().current('bank-statement.index')}
+                                >
+                                    Narration
+                                </NavLink>
 
                             </div>
                         </div>
